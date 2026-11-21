@@ -53,20 +53,27 @@ LIMIT 50;
 
 The demo lives in [demo/](demo/) and runs as its own Worker with static assets. The marketing site and lead form can still run on Vercel. The demo uses the device’s live camera. It samples two frames while you show the item and two while you show its label. The vision provider receives those frames and the catalog image when you run the inspection. The video feed stays in the browser and audio is disabled.
 
-1. Create a Turnstile widget in Cloudflare for the demo's public hostname. Set its public site key as `TURNSTILE_SITE_KEY` in [demo/wrangler.jsonc](demo/wrangler.jsonc). For a first deploy, use the exact `returnproof-demo.<workers-subdomain>.workers.dev` hostname if you plan to use Workers.dev.
-2. Authenticate Wrangler, then from the repository run:
+1. Choose the demo hostname on a domain you manage in Cloudflare and run `npx wrangler login`. Create a Turnstile widget for the chosen hostname and set its public site key as `TURNSTILE_SITE_KEY` in [demo/wrangler.jsonc](demo/wrangler.jsonc).
+2. Set up storage and merchant access:
+   - Create a separate database with `npx wrangler d1 create returnproof-inspections`. Copy its ID to `database_id` in [demo/wrangler.jsonc](demo/wrangler.jsonc).
+   - Set up path-specific access before sharing the review link. In Cloudflare Zero Trust → **Access → Applications**, add a self-hosted application for `<demo-hostname>/review` and `<demo-hostname>/review/*`. Allow only your merchant reviewers. Leave the camera demo at the root public. Set `ACCESS_TEAM_DOMAIN` to your team’s `<team>.cloudflareaccess.com` hostname without a scheme, and copy the application’s AUD tag into `ACCESS_AUDIENCE`. Register this same demo hostname in Turnstile.
+3. From the repository, install dependencies, apply the migration and deploy:
 
    ```sh
+   npm ci
    cd demo
-   npx wrangler login
+   npx wrangler d1 migrations apply INSPECTIONS_DB --remote
    npx wrangler secret put OPENAI_API_KEY
    npx wrangler secret put TURNSTILE_SECRET
    npx wrangler deploy
    ```
 
-   Use an OpenAI key with access to the configured vision model. Set a provider budget and rotate credentials through managed secrets. The Worker receives same-origin requests, verifies Turnstile, and limits inspection attempts per IP. It does not persist images or findings. OpenAI processes the submitted frames under your account's data controls. Use sample or consented photos and review the provider's data handling before accepting real shopper photos.
+   Use an OpenAI key with access to the configured vision model. Set a provider budget and rotate credentials through managed secrets. The Worker receives same-origin requests, verifies Turnstile, and limits inspection attempts per IP. D1 keeps the SKU, generated findings, timestamps and reviewer decision for 30 days, and a daily job removes expired records. Demo storage excludes source images and video. OpenAI processes the submitted frames under your account's data controls. Use sample or consented photos and review the provider's data handling before accepting real shopper photos.
 
-3. Open the deployed Worker URL on an HTTPS-capable browser with a camera. Use your own catalog photo and SKU for a product you can hold up, then click **Start camera** and grant permission. Show the whole item and click **Scan item**, then show the legible label and click **Scan label**. Complete verification and click **Run live inspection**. Check that the camera stays active while the result appears with separate item, SKU, parts, packaging and wear findings. Click **Stop camera** when finished.
-4. Once you have tested the deployed URL, link to it from the marketing site or share it directly.
+   In the Worker’s **Settings → Domains & Routes**, add the chosen custom domain.
 
-For local development, run `npx wrangler dev` from `demo/`. The included illustrative catalog and live camera controls work before provider setup on localhost. To run a live inspection locally, put `OPENAI_API_KEY` and `TURNSTILE_SECRET` in the untracked `demo/.dev.vars` file. Add the official always-pass Turnstile site key `1x00000000000000000000AA` there as `TURNSTILE_SITE_KEY` and use the matching test secret. Use this test pair only on localhost. Live model calls can incur usage charges.
+4. Open the deployed Worker URL on an HTTPS-capable browser with a camera. Use your own catalog photo and SKU for a product you can hold up, then click **Start camera** and grant permission. Show the whole item and click **Scan item**, then show the legible label and click **Scan label**. Complete verification and click **Run live inspection**. Check that the camera stays active while the result appears with separate item, SKU, parts, packaging and wear findings. Click **Stop camera** when finished.
+5. Note the inspection reference and open `/review` as an allowed merchant. Find the saved inspection, accept or reject it, then refresh to verify the decision is still there. Verify that a signed-out visitor cannot list inspections. The demo records the decision and reviewer in D1. It does not send refunds or other updates to Shopify.
+6. Once you have tested the deployed URL, link to it from the marketing site or share it directly.
+
+For local development, run `npm ci` from the repository root, then run `npx wrangler d1 migrations apply INSPECTIONS_DB --local` and `npx wrangler dev` from `demo/`. The local migration uses a separate local database. An authenticated review smoke test requires a Cloudflare Access application. The included illustrative catalog and live camera controls work before provider setup on localhost. To run a live inspection locally, put `OPENAI_API_KEY` and `TURNSTILE_SECRET` in the untracked `demo/.dev.vars` file. Add the official always-pass Turnstile site key `1x00000000000000000000AA` there as `TURNSTILE_SITE_KEY` and use the matching test secret. Use this test pair only on localhost. Live model calls can incur usage charges.

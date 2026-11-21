@@ -16,7 +16,7 @@
   <main class="wrap section">
     <h1>Inspect a return.</h1>
     <p class="intro">Compare the catalog with what you show on your live camera. You’ll see reasons and confidence for each finding. The merchant makes the refund decision.</p>
-    <p class="measure">Keep faces and personal details out of the camera view. When you run the inspection, the demo sends the catalog image and short bursts of still frames to the vision provider. Audio is off, and the demo does not save the video or inspection.</p>
+    <p class="measure">Keep faces and personal details out of the camera view. When you run the inspection, the demo sends the catalog image and short bursts of still frames to the vision provider. Audio is off, and the demo stores the findings for merchant review for 30 days. Camera frames and video are not saved by the demo.</p>
 
     <form id="inspection-form">
       <div class="two">
@@ -61,13 +61,14 @@
     </form>
     <section id="verdict" class="panel" tabindex="-1" hidden aria-labelledby="verdict-heading">
       <h2 id="verdict-heading">Inspection findings</h2>
+      <p id="reference" class="reference"></p>
       <p id="elapsed"></p>
       <div class="two">
         <figure><figcaption>Catalog reference</figcaption><img id="result-catalog" class="preview" alt="Catalog product used for the inspection"></figure>
         <figure><figcaption>Return item</figcaption><img id="result-item" class="preview" alt="Return item frame used for the inspection"></figure>
       </div>
-      <dl id="findings"></dl>
-      <p><strong>Merchant decision pending.</strong> Review flagged or unclear evidence before deciding whether to approve, deny, or request more photos.</p>
+      <dl id="findings" class="finding-list"></dl>
+      <p><strong>Merchant decision pending.</strong> A merchant can open the saved findings later to accept or reject the return.</p>
     </section>
   </main>
 </body>

@@ -1,3 +1,5 @@
+import { renderFindings } from './findings.js';
+
 const byId = (id) => document.getElementById(id);
 const video = byId('video');
 const status = byId('status');
@@ -12,13 +14,6 @@ const skuInput = byId('sku');
 const frames = { item: [], label: [] };
 const captureButtons = Object.fromEntries(Object.keys(frames).map((key) => [key, byId(`capture-${key}`)]));
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const checkNames = {
-  item: 'Item identity',
-  sku: 'Tag / SKU',
-  parts: 'Included parts',
-  packaging: 'Packaging',
-  visible_wear: 'Visible wear',
-};
 let stream;
 let cameraPending = false;
 let cameraRevision = 0;
@@ -188,19 +183,6 @@ catalogInput.addEventListener('change', async () => {
 
 catalogPreview.addEventListener('load', refresh);
 skuInput.addEventListener('input', clearVerdict);
-function addFinding({ check, status: outcome, confidence, reason }) {
-  const row = document.createElement('div');
-  const title = document.createElement('dt');
-  const description = document.createElement('dd');
-  const label = outcome === 'flag' ? 'Flagged' : outcome === 'unclear' ? 'Unclear' :
-    check === 'visible_wear' ? 'No clear signs' : 'Consistent';
-  const review = outcome !== 'matches' || confidence === 'low';
-  title.textContent = `${checkNames[check]} · ${label} · ${confidence} confidence${review ? ' · Review required' : ''}`;
-  description.textContent = reason;
-  row.append(title, description);
-  byId('findings').append(row);
-}
-
 byId('inspection-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (button.disabled) return;
@@ -226,11 +208,12 @@ byId('inspection-form').addEventListener('submit', async (event) => {
     if (!response.ok) throw new Error(result.error);
     byId('result-catalog').src = catalogPreview.src;
     byId('result-item').src = byId('item').src;
-    result.findings.forEach(addFinding);
+    renderFindings(byId('findings'), result.findings);
+    byId('reference').textContent = `Inspection ref ${result.reference}`;
     const seconds = ((performance.now() - started) / 1000).toFixed(1);
     byId('elapsed').textContent = `Run time ${seconds}s · Pilot target under 8s`;
     verdict.hidden = false;
-    status.textContent = 'Inspection complete.';
+    status.textContent = 'Inspection saved for merchant review.';
     verdict.focus();
   } catch (error) {
     if (controller.signal.aborted) return;

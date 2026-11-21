@@ -1,3 +1,5 @@
+import { handleReview, retentionCutoff } from './review.js';
+
 const MAX_IMAGE_CHARS = 500_000;
 const MAX_BODY_BYTES = 2_550_000;
 const FRAMES_PER_VIEW = 2;
@@ -135,8 +137,16 @@ async function inspectImages(input, env, signal) {
 }
 
 export default {
+  async scheduled(_event, env) {
+    await env.INSPECTIONS_DB.prepare('DELETE FROM inspections WHERE created_at < ?').bind(retentionCutoff()).run();
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (['/merchant', '/merchant.html'].includes(url.pathname)) return json({ error: 'Open /review instead.' }, 404);
+    if (url.pathname === '/review' || url.pathname.startsWith('/review/')) {
+      return handleReview(request, url, env, json);
+    }
     if (url.pathname === '/api/config' && request.method === 'GET') {
       return json({ siteKey: env.TURNSTILE_SITE_KEY || '' });
     }
@@ -149,7 +159,7 @@ export default {
     if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') {
       return json({ error: 'Send JSON frames.' }, 415);
     }
-    if (!env.OPENAI_API_KEY || !env.TURNSTILE_SECRET || !env.TURNSTILE_SITE_KEY || !env.INSPECTION_LIMIT) {
+    if (!env.OPENAI_API_KEY || !env.TURNSTILE_SECRET || !env.TURNSTILE_SITE_KEY || !env.INSPECTION_LIMIT || !env.INSPECTIONS_DB) {
       return json({ error: 'The demo is awaiting provider setup.' }, 503);
     }
     try {
@@ -174,13 +184,25 @@ export default {
       return json({ error: 'Provide a valid SKU, catalog image, two frames per live view, and a completed verification.' }, 400);
     }
 
+    let result;
     try {
       if (!(await verifyTurnstile(input.token, url.hostname, env, request.signal))) {
         return json({ error: 'Verification expired. Complete it again and retry.' }, 403);
       }
-      return json(await inspectImages(input, env, request.signal));
+      result = await inspectImages(input, env, request.signal);
     } catch {
       return json({ error: 'Inspection could not be completed. Please try again.' }, 502);
     }
+
+    const reference = crypto.randomUUID();
+    try {
+      const saved = await env.INSPECTIONS_DB.prepare(
+        'INSERT INTO inspections (reference, sku, findings, elapsed_ms, created_at) VALUES (?, ?, ?, ?, ?)',
+      ).bind(reference, input.sku, JSON.stringify(result.findings), result.elapsedMs, new Date().toISOString()).run();
+      if (!saved.success) throw new Error('Insert failed');
+    } catch {
+      return json({ error: 'Could not save the inspection for merchant review. Please try again.' }, 503);
+    }
+    return json({ ...result, reference });
   },
 };

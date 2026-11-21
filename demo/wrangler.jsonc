@@ -5,12 +5,23 @@
   "assets": {
     "directory": "public",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/review", "/review/*", "/merchant.html", "/merchant"]
   },
   "vars": {
     "OPENAI_MODEL": "gpt-4.1-mini",
-    "TURNSTILE_SITE_KEY": ""
+    "TURNSTILE_SITE_KEY": "",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUDIENCE": ""
   },
+  "triggers": { "crons": ["23 3 * * *"] },
+  "d1_databases": [
+    {
+      "binding": "INSPECTIONS_DB",
+      "database_name": "returnproof-inspections",
+      // Replace with the ID printed by wrangler d1 create before deploying.
+      "database_id": "00000000-0000-4000-8000-000000000002"
+    }
+  ],
   "ratelimits": [
     {
       "name": "INSPECTION_LIMIT",
