@@ -7,3 +7,4 @@
 #receipt { overflow-wrap: anywhere; }
 .live-indicator { display: flex; align-items: center; gap: .4rem; font-weight: 700; margin: .75rem 0 .4rem; }
 .live-indicator span { width: .6rem; height: .6rem; border-radius: 50%; background: #127344; }
+.brand-logo { display: block; height: 2rem; width: auto; }

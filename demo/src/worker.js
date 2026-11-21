@@ -344,7 +344,7 @@ export default {
       const asset = await env.ASSETS.fetch(request);
       const headers = new Headers(asset.headers);
       headers.set('Permissions-Policy', 'camera=(self), microphone=()');
-      headers.set('Content-Security-Policy', "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src data:; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'");
+      headers.set('Content-Security-Policy', "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'");
       headers.set('Referrer-Policy', 'no-referrer');
       return new Response(asset.body, { status: asset.status, headers });
     }
