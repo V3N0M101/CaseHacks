@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Inspect the item before approving a Shopify Plus refund. Request a 30-day ReturnProof pilot for $1,500.">
+  <meta name="theme-color" content="#112a27">
+  <title>ReturnProof | Inspect the item before you refund it</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/pilot.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="wordmark" href="#main"><span class="brand-mark" aria-hidden="true"></span>ReturnProof</a>
+      <nav aria-label="Main navigation">
+        <a href="#inspection">Inspection</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a class="button button-small" href="#pilot">Request a pilot <span aria-hidden="true">↗</span></a>
+    </div>
+  </header>
+  <main id="main" tabindex="-1">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="kicker">Photo inspection for Shopify Plus</p>
+          <h1>Inspect the item before you refund it.</h1>
+          <p class="intro">ReturnProof compares a shopper’s photo with your product listing and flags wrong items, wear, missing parts and potential packaging swaps before you approve the refund. Your team always makes the call.</p>
+          <a class="button" href="#pilot">Request the 30-day pilot <span aria-hidden="true">↗</span></a>
+          <p class="fine">$1,500 for 30 days · Cancel anytime</p>
+        </div>
+        <aside class="hero-stat" aria-label="Illustrative monthly losses">
+          <p class="kicker">At 1,500 returns per month</p>
+          <p class="display">$15,000<span>/mo</span></p>
+          <p>Estimated losses to return fraud for a brand at this volume.</p>
+          <a href="#pricing">See the recovery math <span aria-hidden="true">↘</span></a>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section wrap" aria-labelledby="gap">
+      <h2 id="gap">The blind spot is the item itself.</h2>
+      <dl class="metrics">
+        <div><dt>Estimated U.S. returns in 2025</dt><dd>$850B</dd></div>
+        <div><dt>Share of online sales returned</dt><dd>~19%</dd></div>
+        <div><dt>Estimated fraudulent returns</dt><dd>~9% <small>About $76.5B annually</small></dd></div>
+      </dl>
+      <p class="measure">Signifyd, Riskified and NoFraud assess customer and order risk using signals such as order history, address and refund frequency. A first-time wardrober may have a clean record. Loop, Narvar, ZigZag and Happy Returns manage the return workflow. ReturnProof adds an item check at the refund decision, alongside those tools.</p>
+    </section>
+
+    <section class="section band" id="inspection">
+      <div class="wrap">
+        <h2>See what your team would review.</h2>
+        <p class="measure">Every flag includes a reason and its own confidence level. There’s no overall fraud score. Low-confidence flags go to human review. ReturnProof never auto-denies a refund.</p>
+        <figure class="demo">
+          <figcaption>Illustrative inspection · Canvas weekender</figcaption>
+          <div class="demo-grid">
+            <div class="comparison">
+              <div class="photo">
+                <p>Catalog listing</p>
+                <div class="photo-frame" aria-hidden="true"><span class="bag"><i></i></span><span class="strap"></span></div>
+                <span>Bag + detachable strap</span>
+              </div>
+              <div class="photo">
+                <p>Shopper photo</p>
+                <div class="photo-frame returned" aria-hidden="true"><span class="bag"><i></i></span></div>
+                <span>Bag only in frame</span>
+              </div>
+            </div>
+            <div class="verdict">
+              <p class="kicker">Merchant decision pending</p>
+              <dl>
+                <div><dt>SKU matches <span>High confidence</span></dt><dd>The visible care label matches the listed SKU.</dd></div>
+                <div><dt>Accessory may be missing <span>Low confidence · Review required</span></dt><dd>The listing includes a detachable strap. The strap is outside the visible evidence or missing.</dd></div>
+              </dl>
+              <p><strong>Merchant options</strong> · Approve, deny or request another photo.</p>
+            </div>
+          </div>
+        </figure>
+        <h3>From refund request to evidence</h3>
+        <ol class="steps">
+          <li><strong>Trigger the check.</strong> The Shopify Plus private app sends a webhook when a refund is requested.</li>
+          <li><strong>Ask for photos.</strong> One screen prompts the shopper to photograph the item and its tag or care label.</li>
+          <li><strong>Compare the item.</strong> A vision model extracts attributes from both images. OCR reads the tag to confirm the SKU.</li>
+          <li><strong>Review the flags.</strong> Your team sees reasons and confidence for each flag. The pilot targets a verdict in under 8 seconds.</li>
+          <li><strong>Decide the refund.</strong> Approve it, deny it or request more photos.</li>
+          <li><strong>Keep the evidence.</strong> The photo pair and verdict are archived for chargebacks, subject to the agreed retention limit.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section wrap">
+      <h2>What photos can tell you.</h2>
+      <div class="two">
+        <article class="panel">
+          <h3>Catches well</h3>
+          <p>Tag and SKU matches, a completely different item, and missing parts when the relevant area is visible.</p>
+        </article>
+        <article class="panel">
+          <h3>Needs human review</h3>
+          <p>Visible wear and signs of use, plus color or material differences under poor lighting. Counterfeit detection and determining when damage occurred are outside scope.</p>
+        </article>
+      </div>
+      <div class="targets">
+        <h3>Pilot targets</h3>
+        <p>We’ll measure these during the pilot. Actual results can vary with catalog and photo quality.</p>
+        <dl class="metrics target-metrics">
+          <div><dt>Tag and SKU match</dt><dd>95%+</dd></div>
+          <div><dt>Wrong-item detection</dt><dd>90%</dd></div>
+          <div><dt>Wear detection with human review</dt><dd>75–85%</dd></div>
+          <div><dt>False positives on honest returns</dt><dd>&lt;10%</dd></div>
+        </dl>
+        <p class="fine">[Pilot results coming soon]</p>
+      </div>
+    </section>
+
+    <section class="section band">
+      <div class="wrap">
+        <h2>Choose where to add the check.</h2>
+        <div class="two">
+          <article class="panel"><h3>Gate mode</h3><p>Collect shopper photos before issuing a refund. Start with items over about $75, where the amount at risk can justify the extra step.</p></article>
+          <article class="panel"><h3>Audit mode</h3><p>Inspect items at your 3PL after the refund. Shoppers follow the same return process. Use flagged patterns to decide which items to gate later and retain evidence for chargebacks.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap" id="pricing">
+      <h2>Put the pilot against your refund costs.</h2>
+      <div class="two pricing">
+        <article class="panel pilot-price">
+          <h3>30-day paid pilot</h3>
+          <p class="display">$1,500</p>
+          <p>Measure what your team catches, what needs review and how the photo step fits your returns workflow. Cancel anytime.</p>
+          <a class="button" href="#pilot">Request the pilot <span aria-hidden="true">↗</span></a>
+        </article>
+        <article class="panel">
+          <h3>Ongoing pricing</h3>
+          <p class="display">$349<span>/mo</span></p>
+          <p>Includes 750 inspections. Additional inspections cost $0.40 each. At 1,500 inspections, that’s about $649 per month. Annual prepay is $7,788.</p>
+        </article>
+      </div>
+      <div class="roi"><strong>About $5,000 recovered against a $649 monthly fee.</strong><p>Illustrative scenario for a merchant with $15,000 in monthly return fraud who catches one-third of those losses. Use the pilot to measure your actual recovery.</p></div>
+    </section>
+
+    <section class="section band">
+      <div class="wrap">
+        <h2>Protect shopper photos.</h2>
+        <p class="measure">Return photos can contain faces, hands or home interiors. Ask shoppers to frame the item and label only. ReturnProof performs no biometric processing.</p>
+        <p class="measure">Before collecting photos, agree to retention and deletion limits in a data processing agreement. Use the evidence archive within that window. GDPR-aware handling includes limiting access and supporting deletion and other applicable data rights requests.</p>
+      </div>
+    </section>
+
+    <section class="section wrap faq" id="faq">
+      <h2>Questions before you pilot</h2>
+      <details><summary>Will this slow refunds or hurt CSAT?</summary><p>Gate mode adds one photo screen. Start with items over about $75 and track completion, time to refund and CSAT during the pilot. If you want to keep the shopper flow unchanged, start with Audit mode at your 3PL.</p></details>
+      <details><summary>What happens when an honest return gets flagged?</summary><p>A flag gives your team a reason to look. Low-confidence flags go to human review, and your team can approve the refund or request a clearer photo. Under 10% false positives on honest returns is a pilot target. ReturnProof never auto-denies a refund.</p></details>
+      <details><summary>Can I use this with Shopify Plus and Loop?</summary><p>The inspection starts with a refund-request webhook from the Shopify Plus private app. Loop can remain your returns portal. During pilot setup, confirm where the photo prompt and merchant review fit your current refund workflow.</p></details>
+    </section>
+
+    <section class="section closing" id="pilot">
+      <div class="wrap two">
+        <div>
+          <h2>Request a ReturnProof pilot.</h2>
+          <p class="intro">Start with 30 days to measure flagged returns, team review and shopper impact at your own store.</p>
+          <p><strong>$1,500 for 30 days · Cancel anytime</strong></p>
+          <p>Submitting this form requests a follow-up. There is no charge at submission.</p>
+        </div>
+        <form action="/api/pilot" method="post" id="pilot-form">
+          <label for="name">Full name</label>
+          <input id="name" name="name" autocomplete="name" maxlength="120" required>
+          <label for="email">Work email</label>
+          <input id="email" name="email" type="email" autocomplete="email" maxlength="254" required>
+          <label for="store">Store URL</label>
+          <input id="store" name="store" type="url" autocomplete="url" maxlength="300" placeholder="https://yourstore.com" required>
+          <label for="returns">Monthly returns</label>
+          <input id="returns" name="returns" type="number" inputmode="numeric" min="0" max="1000000000" step="1" required>
+          <div hidden><label for="company-site">Leave this field empty</label><input id="company-site" name="company_site" tabindex="-1" autocomplete="off"></div>
+          <button class="button" type="submit">Send pilot request <span aria-hidden="true">↗</span></button>
+          <p class="fine">We use these details to respond to your pilot request.</p>
+          <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+  </main>
+  <footer><div class="wrap"><a class="wordmark" href="#main"><span class="brand-mark" aria-hidden="true"></span>ReturnProof</a></div></footer>
+</body>
+</html>

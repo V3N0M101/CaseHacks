@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS pilot_requests (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  work_email TEXT NOT NULL,
+  store_url TEXT NOT NULL,
+  monthly_returns INTEGER NOT NULL CHECK (monthly_returns BETWEEN 0 AND 1000000000),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
