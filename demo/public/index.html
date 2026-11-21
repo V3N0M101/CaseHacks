@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Compare return video frames with a product listing in the ReturnProof inspection demo.">
+  <meta name="description" content="Inspect a return using your live camera and a product listing.">
   <title>ReturnProof | Inspection demo</title>
   <link rel="stylesheet" href="/base.css">
   <link rel="stylesheet" href="/demo.css">
@@ -15,8 +15,8 @@
   </header>
   <main class="wrap section">
     <h1>Inspect a return.</h1>
-    <p class="intro">Compare the catalog with two frames from a return video. You’ll see reasons and confidence for each finding. The merchant makes the refund decision.</p>
-    <p class="measure">Use the illustrated sample or your own catalog photo and clip. Crop out faces and personal details before uploading. The browser sends the three images to the vision provider for processing. The demo does not store submissions or upload the full video.</p>
+    <p class="intro">Compare the catalog with what you show on your live camera. You’ll see reasons and confidence for each finding. The merchant makes the refund decision.</p>
+    <p class="measure">Keep faces and personal details out of the camera view. When you run the inspection, the demo sends the catalog image and short bursts of still frames to the vision provider. Audio is off, and the demo does not save the video or inspection.</p>
 
     <form id="inspection-form">
       <div class="two">
@@ -30,19 +30,23 @@
           <input id="sku" type="text" value="RP-WK-044" maxlength="80" required>
         </section>
         <section class="panel">
-          <h2>2. Capture the return</h2>
-          <p>Use the player’s controls to pause on a clear view, then capture each frame. In the sample clip, the item appears first and the label follows.</p>
-          <label for="clip">Choose a return clip</label>
-          <input id="clip" type="file" accept="video/mp4,video/webm,video/quicktime">
-          <button type="button" class="secondary" id="sample">Reset to sample catalog and clip</button>
-          <video id="video" src="/return-sample.mp4" controls playsinline preload="metadata" aria-label="Return video"></video>
+          <h2>2. Show the return live</h2>
+          <p>Turn on your camera, then show the whole item. For the label step, move close enough for the SKU to be legible.</p>
+          <div class="camera-controls">
+            <button type="button" class="secondary" id="start-camera">Start camera</button>
+            <button type="button" class="secondary" id="stop-camera" disabled>Stop camera</button>
+          </div>
+          <div class="camera-view">
+            <video id="video" muted autoplay playsinline aria-label="Live return camera"></video>
+            <p id="camera-state">Camera off</p>
+          </div>
           <div class="two">
             <div>
-              <button type="button" class="secondary" id="capture-item">Capture item</button>
+              <button type="button" class="secondary" id="capture-item" disabled>Scan item</button>
               <img id="item" class="preview" alt="Captured return item" hidden>
             </div>
             <div>
-              <button type="button" class="secondary" id="capture-label">Capture label</button>
+              <button type="button" class="secondary" id="capture-label" disabled>Scan label</button>
               <img id="label" class="preview" alt="Captured return label" hidden>
             </div>
           </div>
@@ -50,9 +54,9 @@
       </div>
       <div class="run">
         <div id="challenge"></div>
-        <button class="button" id="inspect" type="submit" disabled>Inspect frames</button>
+        <button class="button" id="inspect" type="submit" disabled>Run live inspection</button>
         <p id="status" role="status" aria-live="polite"></p>
-        <noscript>Enable JavaScript to select video frames and run the inspection.</noscript>
+        <noscript>Enable JavaScript to use the camera and run the inspection.</noscript>
       </div>
     </form>
     <section id="verdict" class="panel" tabindex="-1" hidden aria-labelledby="verdict-heading">

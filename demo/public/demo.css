@@ -9,3 +9,7 @@ input[type="file"] { min-width: 0; max-width: 100%; }
 #findings > div { border-top: 1px solid var(--line); margin-block: .6rem; padding-block: .6rem; }
 #findings dt { font-weight: 750; }
 #findings dd { margin: 0; }
+.camera-controls { display: flex; flex-wrap: wrap; gap: .5rem; }
+.camera-view { position: relative; }
+.camera-view video { display: block; }
+#camera-state { position: absolute; top: .6rem; left: .6rem; margin: 0; padding: .2rem .55rem; background: var(--paper); border-radius: .3rem; font-size: .85rem; font-weight: 700; }

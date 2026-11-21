@@ -5,9 +5,13 @@ const verdict = byId('verdict');
 const button = byId('inspect');
 const catalogPreview = byId('catalog-preview');
 const catalogInput = byId('catalog');
-const clipInput = byId('clip');
+const startCamera = byId('start-camera');
+const stopCamera = byId('stop-camera');
+const cameraState = byId('camera-state');
 const skuInput = byId('sku');
-const frames = { item: '', label: '' };
+const frames = { item: [], label: [] };
+const captureButtons = Object.fromEntries(Object.keys(frames).map((key) => [key, byId(`capture-${key}`)]));
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const checkNames = {
   item: 'Item identity',
   sku: 'Tag / SKU',
@@ -15,33 +19,100 @@ const checkNames = {
   packaging: 'Packaging',
   visible_wear: 'Visible wear',
 };
-let clipUrl;
+let stream;
+let cameraPending = false;
+let cameraRevision = 0;
+let capturePending = false;
+let captureController;
+let requestController;
 let catalogRevision = 0;
 let token = '';
 let widget;
 let busy = false;
 
 function refresh() {
-  button.disabled = busy || !token || !frames.item || !frames.label || !catalogPreview.complete || !catalogPreview.naturalWidth;
+  const ready = Boolean(stream?.active && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA);
+  startCamera.disabled = cameraPending || busy || Boolean(stream);
+  stopCamera.disabled = !stream;
+  for (const capture of Object.values(captureButtons)) {
+    capture.disabled = busy || capturePending || !ready;
+  }
+  button.disabled = busy || capturePending || !ready || !token ||
+    !frames.item.length || !frames.label.length || !catalogPreview.complete || !catalogPreview.naturalWidth;
 }
 
 function clearVerdict() {
   verdict.hidden = true;
   byId('findings').replaceChildren();
+  byId('result-catalog').removeAttribute('src');
+  byId('result-item').removeAttribute('src');
 }
 
-function setClip(src) {
-  if (clipUrl) URL.revokeObjectURL(clipUrl);
-  clipUrl = src.startsWith('blob:') ? src : undefined;
-  video.src = src;
+function clearFrames() {
   for (const key of Object.keys(frames)) {
-    frames[key] = '';
+    frames[key] = [];
     byId(key).removeAttribute('src');
     byId(key).hidden = true;
   }
-  clearVerdict();
+}
+
+function releaseCamera(message) {
+  cameraRevision += 1;
+  captureController?.abort();
+  requestController?.abort();
+  stream?.getTracks().forEach((track) => track.stop());
+  stream = undefined;
+  video.srcObject = null;
+  clearFrames();
+  cameraState.textContent = 'Camera off';
+  if (message) status.textContent = message;
   refresh();
 }
+
+startCamera.addEventListener('click', async () => {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    status.textContent = 'Live camera access needs HTTPS or localhost and a compatible browser.';
+    return;
+  }
+  const revision = ++cameraRevision;
+  cameraPending = true;
+  refresh();
+  status.textContent = 'Waiting for camera permission…';
+  try {
+    const camera = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
+    if (revision !== cameraRevision) {
+      camera.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    stream = camera;
+    for (const track of camera.getVideoTracks()) {
+      track.addEventListener('ended', () => {
+        if (stream === camera) releaseCamera('The camera disconnected.');
+      });
+    }
+    video.srcObject = camera;
+    await video.play();
+    if (stream !== camera) return;
+    clearVerdict();
+    cameraState.textContent = 'Camera live';
+    status.textContent = 'Show the whole return and select Scan item.';
+  } catch (error) {
+    if (revision !== cameraRevision) return;
+    const message = error.name === 'NotAllowedError' ? 'Allow camera access in your browser and try again.' :
+      'Could not open a camera. Check that one is connected and available.';
+    releaseCamera(message);
+  } finally {
+    cameraPending = false;
+    refresh();
+  }
+});
+
+stopCamera.addEventListener('click', () => releaseCamera('Camera stopped.'));
+window.addEventListener('pagehide', () => releaseCamera());
+video.addEventListener('loadeddata', refresh);
 
 function encode(source, width, height) {
   const scale = Math.min(1, 960 / Math.max(width, height));
@@ -55,25 +126,37 @@ function encode(source, width, height) {
   return canvas.toDataURL('image/jpeg', 0.78);
 }
 
-for (const key of Object.keys(frames)) {
-  byId(`capture-${key}`).addEventListener('click', async () => {
-    if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.seeking || !video.videoWidth) {
-      status.textContent = 'Wait for the frame to load, then try capturing it again.';
-      return;
-    }
-    video.pause();
-    const source = video.currentSrc;
-    const time = video.currentTime;
-    // After seeking, wait for the selected frame to reach the compositor.
-    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    if (video.seeking || video.currentSrc !== source || video.currentTime !== time) return;
-    const data = encode(video, video.videoWidth, video.videoHeight);
-    byId(key).src = data;
-    byId(key).hidden = false;
-    frames[key] = data.split(',')[1];
-    clearVerdict();
-    status.textContent = key === 'item' ? 'Item frame captured.' : 'Label frame captured.';
+for (const [key, capture] of Object.entries(captureButtons)) {
+  capture.addEventListener('click', async () => {
+    if (capture.disabled) return;
+    capturePending = true;
+    const controller = new AbortController();
+    captureController = controller;
+    const camera = stream;
     refresh();
+    clearVerdict();
+    status.textContent = key === 'item' ? 'Scanning the live item view…' : 'Scanning the live label view…';
+    const burst = [];
+    try {
+      for (let index = 0; index < 2; index += 1) {
+        await delay(index === 0 ? 150 : 550);
+        if (controller.signal.aborted || stream !== camera) return;
+        if (!video.videoWidth || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+          status.textContent = 'The camera view stalled. Try scanning again.';
+          return;
+        }
+        burst.push(encode(video, video.videoWidth, video.videoHeight));
+      }
+      byId(key).src = burst[0];
+      byId(key).hidden = false;
+      frames[key] = burst.map((data) => data.split(',')[1]);
+      status.textContent = frames.item.length && frames.label.length ? 'Both views are ready. Run the live inspection.' :
+        key === 'item' ? 'Item scanned. Move closer and scan the label.' : 'Label scanned. Show the whole item and scan it.';
+    } finally {
+      captureController = undefined;
+      capturePending = false;
+      refresh();
+    }
   });
 }
 
@@ -105,28 +188,6 @@ catalogInput.addEventListener('change', async () => {
 
 catalogPreview.addEventListener('load', refresh);
 skuInput.addEventListener('input', clearVerdict);
-clipInput.addEventListener('change', () => {
-  const file = clipInput.files[0];
-  if (file) {
-    status.textContent = '';
-    setClip(URL.createObjectURL(file));
-  }
-});
-video.addEventListener('error', () => {
-  status.textContent = 'Could not play this clip. Try an H.264 MP4 or WebM file.';
-});
-
-byId('sample').addEventListener('click', () => {
-  catalogRevision += 1;
-  catalogInput.value = '';
-  clipInput.value = '';
-  catalogPreview.src = '/catalog.jpg';
-  skuInput.value = 'RP-WK-044';
-  byId('catalog-caption').textContent = 'Illustrated sample · RP-WK-044';
-  status.textContent = '';
-  setClip('/return-sample.mp4');
-});
-
 function addFinding({ check, status: outcome, confidence, reason }) {
   const row = document.createElement('div');
   const title = document.createElement('dt');
@@ -148,7 +209,9 @@ byId('inspection-form').addEventListener('submit', async (event) => {
   clearVerdict();
   status.textContent = 'Comparing catalog, item and label…';
   const started = performance.now();
-  const inputs = ['catalog', 'clip', 'sku', 'sample', 'capture-item', 'capture-label'].map(byId);
+  const inputs = [catalogInput, skuInput];
+  const controller = new AbortController();
+  requestController = controller;
   for (const input of inputs) input.disabled = true;
   try {
     const catalog = encode(catalogPreview, catalogPreview.naturalWidth, catalogPreview.naturalHeight).split(',')[1];
@@ -156,9 +219,10 @@ byId('inspection-form').addEventListener('submit', async (event) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ sku: skuInput.value.trim(), catalog, ...frames, token }),
-      signal: AbortSignal.timeout(33000),
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(33000)]),
     });
     const result = await response.json();
+    if (controller.signal.aborted) return;
     if (!response.ok) throw new Error(result.error);
     byId('result-catalog').src = catalogPreview.src;
     byId('result-item').src = byId('item').src;
@@ -169,9 +233,11 @@ byId('inspection-form').addEventListener('submit', async (event) => {
     status.textContent = 'Inspection complete.';
     verdict.focus();
   } catch (error) {
+    if (controller.signal.aborted) return;
     status.textContent = error.name === 'TimeoutError' ? 'The inspection timed out. Try again.' :
       error.message || 'Could not complete the inspection.';
   } finally {
+    requestController = undefined;
     busy = false;
     token = '';
     for (const input of inputs) input.disabled = false;
