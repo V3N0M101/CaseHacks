@@ -47,3 +47,26 @@ FROM pilot_requests
 ORDER BY id DESC
 LIMIT 50;
 ```
+
+
+## Deploy the inspection demo to Cloudflare Workers
+
+The demo lives in [demo/](demo/) and runs as its own Worker with static assets. The marketing site and lead form can still run on Vercel. The demo uses three still images per comparison: the catalog, the returned item, and its label. The full clip stays in the browser.
+
+1. Create a Turnstile widget in Cloudflare for the demo's public hostname. Set its public site key as `TURNSTILE_SITE_KEY` in [demo/wrangler.jsonc](demo/wrangler.jsonc). For a first deploy, use the exact `returnproof-demo.<workers-subdomain>.workers.dev` hostname if you plan to use Workers.dev.
+2. Authenticate Wrangler, then from the repository run:
+
+   ```sh
+   cd demo
+   npx wrangler login
+   npx wrangler secret put OPENAI_API_KEY
+   npx wrangler secret put TURNSTILE_SECRET
+   npx wrangler deploy
+   ```
+
+   Use an OpenAI key with access to the configured vision model. Set a provider budget and rotate credentials through managed secrets. The Worker receives same-origin requests, verifies Turnstile, and limits inspection attempts per IP. It does not persist images or findings. OpenAI processes the submitted frames under your account's data controls. Use sample or consented photos and review the provider's data handling before accepting real shopper photos.
+
+3. Open the deployed Worker URL. Pause the sample around **0:01**, click **Capture item**, then pause around **0:04** and click **Capture label**. Complete verification and click **Inspect frames**. Check that the result includes separate item, SKU, parts, packaging and wear findings, plus the measured run time. The sample is an illustration with a matching SKU and a strap shown only in the catalog.
+4. Once you have tested the deployed URL, link to it from the marketing site or share it directly.
+
+For local development, run `npx wrangler dev` from `demo/`. The sample and capture controls work before provider setup. To run a live inspection locally, put `OPENAI_API_KEY` and `TURNSTILE_SECRET` in the untracked `demo/.dev.vars` file. Add the official always-pass Turnstile site key `1x00000000000000000000AA` there as `TURNSTILE_SITE_KEY` and use the matching test secret. Use this test pair only on localhost. Live model calls can incur usage charges.

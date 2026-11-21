@@ -1,0 +1,39 @@
+:root {
+  color-scheme: light;
+  --ink: #112a27;
+  --paper: #fcfbf7;
+  --line: #c9d5cf;
+  --band: #edf3ee;
+  --accent: #d4fa83;
+  font: 100%/1.55 system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  scroll-padding-top: 5.5rem;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body, figure, dd, dl { margin: 0; }
+p { margin: 0 0 1rem; }
+:focus-visible { outline: .18rem solid #356c96; outline-offset: .22rem; }
+h1, h2 { margin: 0 0 1rem; line-height: 1.12; font-weight: 750; letter-spacing: -.055em; }
+h1 { font-size: clamp(2.75rem, 7vw, 5.6rem); }
+.wrap { width: min(100% - 2rem, 70rem); margin-inline: auto; }
+.section { padding-block: clamp(2rem, 5vw, 4rem); }
+.measure { max-width: 70ch; }
+.intro { font-size: clamp(1.12rem, 2vw, 1.35rem); max-width: 56ch; }
+.site-header { position: sticky; top: 0; z-index: 1; background: var(--paper); border-bottom: 1px solid var(--line); }
+.header-row, .wordmark { display: flex; align-items: center; }
+.header-row { min-height: 4.25rem; }
+.wordmark { gap: .5rem; font-size: 1.2rem; font-weight: 800; letter-spacing: -.045em; }
+.brand-mark { display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 2px solid currentColor; border-radius: .35rem; }
+.brand-mark::before { content: ""; width: .57rem; height: .34rem; border: solid currentColor; border-width: 0 0 2px 2px; transform: translateY(-.06rem) rotate(-45deg); }
+.two { display: grid; gap: 1rem; }
+.panel { border: 1px solid var(--line); border-radius: .65rem; padding: clamp(1rem, 3vw, 1.75rem); }
+figcaption { font-weight: 700; }
+label { display: block; font-weight: 650; margin-bottom: .25rem; }
+input { display: block; width: 100%; min-height: 2.8rem; margin-bottom: .9rem; padding: .55rem .65rem; border: 1px solid #72847d; border-radius: .35rem; font: inherit; color: inherit; background: white; }
+.button { background: var(--accent); color: var(--ink); border: 1px solid var(--ink); border-radius: .45rem; padding: .75rem 1rem; font: inherit; font-weight: 750; cursor: pointer; }
+.button:hover { background: #e4ffab; }
+button:disabled { opacity: .65; cursor: default; }
+@media (min-width: 44rem) {
+  .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
