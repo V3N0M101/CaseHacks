@@ -82,14 +82,15 @@ async function authorized(request, secret) {
   return mismatch === 0;
 }
 
-function receipt(row, sku, status) {
+function receipt(row, sku, status, mode = 'vision') {
   if (row.sku !== sku) return json({ error: 'This buyer reference is already in use for another SKU.' }, 409);
+  if (row.analysis_mode !== mode) return json({ error: 'Use a new buyer reference to change the analysis mode.' }, 409);
   return json({ reference: row.reference, buyerReference: row.buyer_reference }, status);
 }
 
 function findSubmission(db, reference) {
   return db.prepare(
-    'SELECT reference, buyer_reference, sku FROM inspections WHERE buyer_reference = ?',
+    'SELECT reference, buyer_reference, sku, analysis_mode FROM inspections WHERE buyer_reference = ?',
   ).bind(reference).first();
 }
 
@@ -223,8 +224,8 @@ async function issueBuyerLink(input, env, url) {
   const expiresAt = Date.now() + 30 * 60 * 1000;
   const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
   const result = await env.INSPECTIONS_DB.prepare(
-    'INSERT INTO buyer_links (token_hash, buyer_reference, sku, catalog, expires_at) VALUES (?, ?, ?, ?, ?)',
-  ).bind(await hashToken(token), input.buyerReference, input.sku, input.catalog, expiresAt).run();
+    'INSERT INTO buyer_links (token_hash, buyer_reference, sku, catalog, expires_at, skip_analysis) VALUES (?, ?, ?, ?, ?, ?)',
+  ).bind(await hashToken(token), input.buyerReference, input.sku, input.catalog, expiresAt, input.skipAnalysis === true ? 1 : 0).run();
   if (!result.success) throw new Error('Buyer link insert failed');
   const link = new URL('/mobile', url);
   link.hash = token;
@@ -263,7 +264,7 @@ async function loadBuyerLink(request, env) {
   const match = /^Bearer ([a-f0-9]{64})$/.exec(request.headers.get('Authorization') || '');
   if (!match) return null;
   return env.INSPECTIONS_DB.prepare(
-    'SELECT token_hash, buyer_reference AS buyerReference, sku, catalog FROM buyer_links WHERE token_hash = ? AND expires_at > ?',
+    'SELECT token_hash, buyer_reference AS buyerReference, sku, catalog, skip_analysis FROM buyer_links WHERE token_hash = ? AND expires_at > ?',
   ).bind(await hashToken(match[1]), Date.now()).first();
 }
 
@@ -303,16 +304,16 @@ async function submitInspection(input, request, env) {
   return saveInspection(input, result, db);
 }
 
-async function saveInspection(input, result, db) {
+async function saveInspection(input, result, db, mode = 'vision') {
   const reference = crypto.randomUUID();
   try {
     const saved = await db.prepare(
-      'INSERT INTO inspections (reference, buyer_reference, sku, findings, elapsed_ms, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(buyer_reference) DO NOTHING',
-    ).bind(reference, input.buyerReference, input.sku, JSON.stringify(result.findings), result.elapsedMs, new Date().toISOString()).run();
+      'INSERT INTO inspections (reference, buyer_reference, sku, findings, elapsed_ms, created_at, analysis_mode) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(buyer_reference) DO NOTHING',
+    ).bind(reference, input.buyerReference, input.sku, JSON.stringify(result.findings), result.elapsedMs, new Date().toISOString(), mode).run();
     if (!saved.success) throw new Error('Insert failed');
     if (saved.meta.changes === 1) return json({ reference, buyerReference: input.buyerReference }, 201);
     const existing = await findSubmission(db, input.buyerReference);
-    if (existing) return receipt(existing, input.sku, 200);
+    if (existing) return receipt(existing, input.sku, 200, mode);
   } catch {
     return json({ error: 'Could not save the inspection for merchant review. Please try again.' }, 503);
   }
@@ -402,6 +403,11 @@ async function buyerApi(request, url, env) {
     return json({ error: 'Could not read the submission.' }, 400);
   }
   if (input === null) return json({ error: 'The images are too large.' }, 413);
+  if (path === '/api/buyer/session') return json({ skipAnalysis: link.skip_analysis === 1 });
+  if (link?.skip_analysis === 1) {
+    if (path !== '/api/buyer/complete') return json({ error: 'Analysis is disabled for this demo link.' }, 409);
+    return saveInspection(link, { findings: [], elapsedMs: 0 }, env.INSPECTIONS_DB, 'skipped');
+  }
   if (path === '/api/buyer/analyze') return analyzeBuyerView(link, input, request, env);
   if (path === '/api/buyer/complete') return completeBuyerInspection(link, input, env);
   if (buyer && input) input = { ...link, item: input.item, label: input.label };
@@ -440,7 +446,7 @@ export default {
     if (url.pathname === '/review' || url.pathname.startsWith('/review/')) {
       return handleReview(request, url, env, json, createMerchantBuyerLink);
     }
-    if (['/api/inspect', '/api/buyer-links', '/api/buyer/submit', '/api/buyer/analyze', '/api/buyer/complete'].includes(url.pathname)) return buyerApi(request, url, env);
+    if (['/api/inspect', '/api/buyer-links', '/api/buyer/submit', '/api/buyer/analyze', '/api/buyer/complete', '/api/buyer/session'].includes(url.pathname)) return buyerApi(request, url, env);
     return url.pathname.startsWith('/api/') ? json({ error: 'Unknown endpoint.' }, 404) : env.ASSETS.fetch(request);
   },
 };

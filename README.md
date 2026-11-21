@@ -74,7 +74,7 @@ The portal is in [demo/](demo/). It is separate from the marketing site and pilo
 
 ### Try the live demo from the marketing site
 
-Click **Try the live demo** on the marketing site and open the merchant portal. Sign in, enter a return reference and SKU, and upload a catalog photo. **Create buyer link** gives you a private 30-minute link to open on a phone. After the buyer submits, refresh the merchant queue and review the findings.
+Click **Try the live demo** on the marketing site and open the merchant portal. Sign in, enter a return reference and SKU, and upload a catalog photo. **Create buyer link** gives you a private 30-minute link to open on a phone. Select **Skip AI analysis for this demo** before creating the link if you want to test the camera, submission, and review without a model call. The buyer’s images stay on the device, and the portal clearly marks the result as skipped. After the buyer submits, refresh the merchant queue and review the findings.
 
 ### Create a buyer link from the terminal
 

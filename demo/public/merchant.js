@@ -40,7 +40,11 @@ function cardFor(inspection) {
   metadata.textContent = `${formatDate.format(new Date(inspection.created_at))} · Ref ${inspection.reference}`;
   findings.className = 'finding-list';
   actions.className = 'review-actions';
-  renderFindings(findings, inspection.findings);
+  const skipped = document.createElement('p');
+  skipped.textContent = 'Analysis skipped · Demo submission. No AI findings are available.';
+  skipped.hidden = inspection.analysis_mode !== 'skipped';
+  if (skipped.hidden) renderFindings(findings, inspection.findings);
+  else findings.hidden = true;
 
   function showDecision(record) {
     label.textContent = record.status === 'pending' ? 'Awaiting merchant decision' :
@@ -78,7 +82,7 @@ function cardFor(inspection) {
     actions.append(control);
   }
   showDecision(inspection);
-  card.append(title, buyerReference, metadata, label, findings, actions);
+  card.append(title, buyerReference, metadata, label, skipped, findings, actions);
   return card;
 }
 

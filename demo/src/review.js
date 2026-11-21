@@ -2,7 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 20;
-const fields = 'reference, buyer_reference, sku, findings, elapsed_ms, created_at, status, decided_at, decided_by';
+const fields = 'reference, buyer_reference, sku, findings, elapsed_ms, analysis_mode, created_at, status, decided_at, decided_by';
 let keySet;
 
 export function retentionCutoff() {

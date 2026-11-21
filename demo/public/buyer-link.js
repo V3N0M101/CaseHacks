@@ -48,6 +48,7 @@ form.addEventListener('submit', async (event) => {
       body: JSON.stringify({
         buyerReference: fields.get('buyerReference').trim(),
         sku: fields.get('sku').trim(),
+        skipAnalysis: fields.has('skipAnalysis'),
         catalog,
       }),
       redirect: 'manual',

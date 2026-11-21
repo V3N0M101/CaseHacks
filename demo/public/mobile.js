@@ -16,12 +16,14 @@ let stream;
 let cameraRevision = 0;
 let stages = {};
 let submitting = false;
+let skipAnalysis = false;
 
 function renderAnalysis() {
   const views = Object.entries(stages);
   analysisStatus.hidden = !views.length;
   analysisStatus.textContent = views.map(([stage, result]) => {
     const name = stage === 'item' ? 'Item' : 'Label';
+    if (skipAnalysis) return `${name} captured.`;
     if (result.error) return `${name}: ${result.error}`;
     return result.id ? `${name} analyzed.` : `Analyzing ${stage}…`;
   }).join(' ');
@@ -51,7 +53,9 @@ async function analyze(stage, frames) {
   const controller = new AbortController();
   const view = { controller, frames };
   stages[stage] = view;
+  if (skipAnalysis) view.id = stage;
   renderAnalysis();
+  if (skipAnalysis) return;
   try {
     const result = await buyerRequest('analyze', { stage, frames },
       AbortSignal.any([controller.signal, AbortSignal.timeout(32000)]));
@@ -167,10 +171,11 @@ submit.addEventListener('click', async () => {
   retake.disabled = true;
   status.textContent = 'Sending findings to the merchant…';
   try {
-    const result = await buyerRequest('complete', {
+    const details = skipAnalysis ? {} : {
       itemAnalysisId: stages.item.id,
       labelAnalysisId: stages.label.id,
-    }, AbortSignal.timeout(15000));
+    };
+    const result = await buyerRequest('complete', details, AbortSignal.timeout(15000));
     if (!result.reference) throw new Error('The return could not be submitted.');
     stopCamera();
     clearAnalysis();
@@ -203,5 +208,23 @@ window.addEventListener('pagehide', () => {
   start.hidden = !confirm.hidden || !get('done').hidden;
 });
 
-if (/^[a-f0-9]{64}$/.test(token)) start.disabled = false;
-else status.textContent = 'Open the full return link from your merchant to begin.';
+async function loadSession() {
+  if (!/^[a-f0-9]{64}$/.test(token)) {
+    status.textContent = 'Open the full return link from your merchant to begin.';
+    return;
+  }
+  status.textContent = 'Checking your buyer link…';
+  try {
+    const session = await buyerRequest('session', {}, AbortSignal.timeout(10000));
+    skipAnalysis = session.skipAnalysis === true;
+    get('analysis-description').textContent = skipAnalysis ?
+      'Demo mode. You can try the camera and submission steps. This link skips AI analysis and does not upload your images.' :
+      'ReturnProof analyzes sampled frames from the live camera as you show each view. The merchant makes the refund decision.';
+    status.textContent = '';
+    start.disabled = false;
+  } catch (error) {
+    status.textContent = error.message || 'Could not load the buyer link. Refresh to try again.';
+  }
+}
+
+void loadSession();
