@@ -8,7 +8,7 @@ const confirm = get('confirm');
 const submit = get('submit');
 const retake = get('retake');
 const token = location.hash.slice(1);
-const prompts = ['Show the full front of the item', 'Show the full back of the item', 'Hold the SKU or care label close to the camera'];
+const prompts = ['Show the full item', 'Hold the SKU or care label close to the camera'];
 let stream;
 let item = [];
 let label = [];
@@ -63,20 +63,21 @@ take.addEventListener('click', async () => {
   take.disabled = true;
   const current = stream;
   try {
-    if (item.length < 2) {
-      item.push(snapshot());
-      get('prompt').textContent = prompts[item.length];
-      return;
-    }
     const first = snapshot();
     await new Promise(resolve => setTimeout(resolve, 450));
     if (current !== stream) return;
-    label = [first, snapshot()];
+    const second = snapshot();
+    if (!item.length) {
+      item = [first, second];
+      get('prompt').textContent = prompts[1];
+      return;
+    }
+    label = [first, second];
     stopCamera();
     capture.hidden = true;
-    const images = [...item, label[0]].map((frame, index) => {
+    const images = [item[0], label[0]].map((frame, index) => {
       const image = new Image();
-      image.alt = ['Front of return', 'Back of return', 'Return label'][index];
+      image.alt = ['Item', 'Return label'][index];
       image.src = 'data:image/jpeg;base64,' + frame;
       return image;
     });
