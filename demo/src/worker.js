@@ -88,6 +88,51 @@ function findSubmission(db, reference) {
   ).bind(reference).first();
 }
 
+const imageErrorCodes = new Set([
+  'invalid_image', 'invalid_image_format', 'invalid_base64_image',
+  'image_parse_error', 'image_too_large', 'unsupported_image_media_type',
+]);
+
+class InspectionError extends Error {
+  constructor(code, detail) {
+    super(code);
+    this.code = code;
+    this.detail = detail;
+  }
+}
+
+async function checkVisionResponse(response) {
+  if (response.ok) return;
+  const { status } = response;
+  const providerCode = status === 400 || status === 429 ?
+    (await response.json().catch(() => null))?.error?.code : undefined;
+  const code = status === 401 || status === 403 ? 'provider_auth' :
+    status === 404 ? 'provider_model' :
+    status === 429 ? (providerCode === 'insufficient_quota' ? 'provider_quota' : 'provider_rate_limit') :
+    imageErrorCodes.has(providerCode) ? 'provider_image' : 'provider_http';
+  throw new InspectionError(code, status);
+}
+
+function inspectionFailure(error) {
+  const code = error instanceof InspectionError ? error.code :
+    error?.name === 'TimeoutError' ? 'provider_timeout' :
+    error?.name === 'AbortError' ? 'request_cancelled' : 'provider_transport';
+  console.error('Inspection failed', { code, ...(error instanceof InspectionError && { detail: error.detail }) });
+  const messages = {
+    provider_auth: 'The inspection service could not sign in to its vision provider. Ask the merchant to check the API key.',
+    provider_model: 'The configured inspection model is unavailable. Ask the merchant to check model access.',
+    provider_quota: 'The inspection service has exhausted its API quota. Ask the merchant to check API billing and limits.',
+    provider_rate_limit: 'The inspection service is busy. Wait a minute and try Submit again.',
+    provider_image: 'The vision provider could not read one of the images. Retake your captures and try again.',
+    provider_timeout: 'The inspection timed out. Try Submit again.',
+    provider_refusal: 'The inspection provider could not process these images. Retake them with only the product and label in view.',
+  };
+  return json({
+    error: messages[code] || 'Inspection could not be completed. Please try again.',
+    code,
+  }, code === 'provider_timeout' ? 504 : 502);
+}
+
 async function inspectImages(input, env, signal) {
   const image = (base64) => ({
     type: 'image_url',
@@ -101,7 +146,7 @@ async function inspectImages(input, env, signal) {
     body: JSON.stringify({
       model: env.OPENAI_MODEL,
       store: false,
-      max_completion_tokens: 600,
+      max_completion_tokens: 1200,
       response_format: {
         type: 'json_schema',
         json_schema: { name: 'returnproof_inspection', strict: true, schema: verdictSchema },
@@ -126,19 +171,31 @@ async function inspectImages(input, env, signal) {
     }),
   });
 
-  if (!response.ok) throw new Error('Vision request failed');
-  const result = await response.json();
-  const choice = result.choices?.[0];
-  if (choice?.finish_reason !== 'stop' || choice.message?.refusal) throw new Error('Inspection incomplete');
-  const findings = JSON.parse(choice.message.content).findings;
+  await checkVisionResponse(response);
+  const result = await response.json().catch((error) => {
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') throw error;
+    throw new InspectionError('provider_output');
+  });
+  const choice = result?.choices?.[0];
+  if (choice?.message?.refusal || choice?.finish_reason === 'content_filter') {
+    throw new InspectionError('provider_refusal');
+  }
+  if (choice?.finish_reason === 'length') throw new InspectionError('provider_truncated');
+  if (choice?.finish_reason !== 'stop') throw new InspectionError('provider_output');
+  let findings;
+  try {
+    findings = JSON.parse(choice.message.content)?.findings;
+  } catch {
+    throw new InspectionError('provider_output');
+  }
   return {
     elapsedMs: Math.round(performance.now() - started),
     findings: CHECKS.map((check) => {
-      const { status, confidence, reason } = findings[check];
+      const { status, confidence, reason } = findings?.[check] ?? {};
       if (!['matches', 'flag', 'unclear'].includes(status) ||
           !['high', 'medium', 'low'].includes(confidence) ||
           typeof reason !== 'string' || !reason.trim()) {
-        throw new Error('Malformed inspection');
+        throw new InspectionError('provider_output');
       }
       return { check, status, confidence, reason: reason.slice(0, 300) };
     }),
@@ -200,8 +257,8 @@ async function submitInspection(input, request, env) {
   let result;
   try {
     result = await inspectImages(input, env, request.signal);
-  } catch {
-    return json({ error: 'Inspection could not be completed. Please try again.' }, 502);
+  } catch (error) {
+    return inspectionFailure(error);
   }
 
   const reference = crypto.randomUUID();
