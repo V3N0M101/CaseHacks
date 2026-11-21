@@ -5,11 +5,10 @@
   "assets": {
     "directory": "public",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*", "/review", "/review/*", "/merchant.html", "/merchant"]
+    "run_worker_first": ["/", "/api/*", "/review", "/review/*", "/merchant.html", "/merchant"]
   },
   "vars": {
     "OPENAI_MODEL": "gpt-4.1-mini",
-    "TURNSTILE_SITE_KEY": "",
     "ACCESS_TEAM_DOMAIN": "",
     "ACCESS_AUDIENCE": ""
   },

@@ -2,7 +2,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const PAGE_SIZE = 20;
-const fields = 'reference, sku, findings, elapsed_ms, created_at, status, decided_at, decided_by';
+const fields = 'reference, buyer_reference, sku, findings, elapsed_ms, created_at, status, decided_at, decided_by';
 let keySet;
 
 export function retentionCutoff() {
@@ -82,6 +82,7 @@ export async function handleReview(request, url, env, json) {
     const asset = await env.ASSETS.fetch(new Request(new URL('/merchant', url)));
     const headers = new Headers(asset.headers);
     headers.set('Cache-Control', 'private, no-store');
+    headers.set('Permissions-Policy', 'camera=(), microphone=()');
     return new Response(asset.body, { status: asset.status, headers });
   }
 

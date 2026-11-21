@@ -1,17 +1,8 @@
 h2 { font-size: clamp(1.55rem, 3vw, 2.2rem); }
-form .panel { min-width: 0; }
-input[type="file"] { min-width: 0; max-width: 100%; }
-.preview, video { max-width: 100%; width: 100%; aspect-ratio: 4 / 3; object-fit: contain; border-radius: .4rem; background: var(--band); margin: .65rem 0; }
 .secondary { font: inherit; font-weight: 650; color: var(--ink); background: var(--band); padding: .55rem .65rem; border: 1px solid var(--line); border-radius: .4rem; cursor: pointer; }
-.run { margin: 1.5rem 0; }
-#challenge { margin-bottom: .7rem; }
-#status { margin: .6rem 0 0; }
 .finding-list > div { border-top: 1px solid var(--line); margin-block: .6rem; padding-block: .6rem; }
 .finding-list dt { font-weight: 750; }
 .finding-list dd { margin: 0; }
-.camera-controls { display: flex; flex-wrap: wrap; gap: .5rem; }
-.camera-view { position: relative; }
-.camera-view video { display: block; }
-#camera-state { position: absolute; top: .6rem; left: .6rem; margin: 0; padding: .2rem .55rem; background: var(--paper); border-radius: .3rem; font-size: .85rem; font-weight: 700; }
+.review-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .review-card { margin-block: 1rem; }
-.reference, .review-card p { overflow-wrap: anywhere; }
+.review-card p, .review-card h2 { overflow-wrap: anywhere; }

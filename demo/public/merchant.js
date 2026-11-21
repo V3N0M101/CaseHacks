@@ -34,9 +34,12 @@ function cardFor(inspection) {
 
   card.className = 'panel review-card';
   title.textContent = `SKU ${inspection.sku}`;
+  const buyerReference = document.createElement('p');
+  buyerReference.textContent = inspection.buyer_reference ? `Buyer submission ${inspection.buyer_reference}` : '';
+  buyerReference.hidden = !inspection.buyer_reference;
   metadata.textContent = `${formatDate.format(new Date(inspection.created_at))} · Ref ${inspection.reference}`;
   findings.className = 'finding-list';
-  actions.className = 'camera-controls';
+  actions.className = 'review-actions';
   renderFindings(findings, inspection.findings);
 
   function showDecision(record) {
@@ -75,7 +78,7 @@ function cardFor(inspection) {
     actions.append(control);
   }
   showDecision(inspection);
-  card.append(title, metadata, label, findings, actions);
+  card.append(title, buyerReference, metadata, label, findings, actions);
   return card;
 }
 
@@ -91,7 +94,7 @@ async function load(before) {
     else list.replaceChildren(...cards);
     next = result.next;
     older.hidden = !next;
-    status.textContent = list.childElementCount ? '' : 'No saved inspections yet.';
+    status.textContent = list.childElementCount ? '' : 'No buyer submissions yet.';
   } catch (error) {
     status.textContent = error.message || 'Could not load inspections.';
   } finally {
