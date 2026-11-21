@@ -73,7 +73,7 @@ async function recordDecision(request, url, db, reference, email, json) {
   return json({ inspection: toInspection(row) });
 }
 
-export async function handleReview(request, url, env, json) {
+export async function handleReview(request, url, env, json, createBuyerLink) {
   const email = await reviewer(request, env);
   if (!email) return json({ error: 'Sign in through Cloudflare Access to review inspections.' }, 401);
 
@@ -84,6 +84,10 @@ export async function handleReview(request, url, env, json) {
     headers.set('Cache-Control', 'private, no-store');
     headers.set('Permissions-Policy', 'camera=(), microphone=()');
     return new Response(asset.body, { status: asset.status, headers });
+  }
+
+  if (pathname === '/review/api/buyer-links' && request.method === 'POST') {
+    return createBuyerLink(request, url, env);
   }
 
   const db = env.INSPECTIONS_DB;

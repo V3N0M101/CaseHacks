@@ -99,6 +99,7 @@ footer { padding-block: 1.3rem; }
   .two, .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .demo-grid { grid-template-columns: 1.5fr 1fr; }
 }
-@media (max-width: 35rem) {
+@media (max-width: 42rem) {
   nav { display: none; }
 }
+.hero-demo { margin: 1rem 0 0; }

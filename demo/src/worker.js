@@ -231,6 +231,34 @@ async function issueBuyerLink(input, env, url) {
   return json({ url: link.href, expiresAt: new Date(expiresAt).toISOString() }, 201);
 }
 
+async function createBuyerLink(input, url, env) {
+  if (!validReference(input) || !isJpeg(input.catalog)) {
+    return json({ error: 'Provide a valid buyer reference, SKU, and catalog image.' }, 400);
+  }
+  try {
+    return await issueBuyerLink(input, env, url);
+  } catch {
+    return json({ error: 'Could not create the buyer link.' }, 503);
+  }
+}
+
+async function createMerchantBuyerLink(request, url, env) {
+  if (request.headers.get('Origin') !== url.origin) {
+    return json({ error: 'Create the link from the merchant portal.' }, 403);
+  }
+  if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') {
+    return json({ error: 'Send JSON.' }, 415);
+  }
+  let input;
+  try {
+    input = await readInput(request);
+  } catch {
+    return json({ error: 'Could not read the buyer link details.' }, 400);
+  }
+  if (input === null) return json({ error: 'The catalog image is too large.' }, 413);
+  return createBuyerLink(input, url, env);
+}
+
 async function loadBuyerLink(request, env) {
   const match = /^Bearer ([a-f0-9]{64})$/.exec(request.headers.get('Authorization') || '');
   if (!match) return null;
@@ -377,15 +405,9 @@ async function buyerApi(request, url, env) {
   if (path === '/api/buyer/analyze') return analyzeBuyerView(link, input, request, env);
   if (path === '/api/buyer/complete') return completeBuyerInspection(link, input, env);
   if (buyer && input) input = { ...link, item: input.item, label: input.label };
+  if (path === '/api/buyer-links') return createBuyerLink(input, url, env);
   if (!validReference(input) || !isJpeg(input.catalog)) {
     return json({ error: 'Provide a valid buyer reference, SKU, and catalog image.' }, 400);
-  }
-  if (path === '/api/buyer-links') {
-    try {
-      return await issueBuyerLink(input, env, url);
-    } catch {
-      return json({ error: 'Could not create the buyer link.' }, 503);
-    }
   }
   if (!isBurst(input.item) || !isBurst(input.label)) {
     return json({ error: 'Provide two JPEG frames for the item and two for the label.' }, 400);
@@ -416,7 +438,7 @@ export default {
     }
     if (['/merchant', '/merchant.html'].includes(url.pathname)) return json({ error: 'Open /review instead.' }, 404);
     if (url.pathname === '/review' || url.pathname.startsWith('/review/')) {
-      return handleReview(request, url, env, json);
+      return handleReview(request, url, env, json, createMerchantBuyerLink);
     }
     if (['/api/inspect', '/api/buyer-links', '/api/buyer/submit', '/api/buyer/analyze', '/api/buyer/complete'].includes(url.pathname)) return buyerApi(request, url, env);
     return url.pathname.startsWith('/api/') ? json({ error: 'Unknown endpoint.' }, 404) : env.ASSETS.fetch(request);

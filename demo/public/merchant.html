@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/base.css">
   <link rel="stylesheet" href="/demo.css">
   <script src="/merchant.js" type="module"></script>
+  <script src="/buyer-link.js" type="module"></script>
 </head>
 <body>
   <header class="site-header">
@@ -16,6 +17,29 @@
   <main class="wrap section">
     <h1>Merchant review</h1>
     <p class="measure">Review findings from buyer submissions and record an accept or reject decision. The demo keeps findings for 30 days. A decision here is for review only and does not issue a refund.</p>
+    <details class="panel buyer-link" id="demo" open>
+      <summary>Create a buyer camera link</summary>
+      <p>Enter the expected SKU and upload a reference photo of the item. Share the 30-minute link or open it on your phone.</p>
+      <form id="buyer-link-form">
+        <label for="demo-reference">Return reference</label>
+        <input name="buyerReference" id="demo-reference" maxlength="80" required>
+        <label for="demo-sku">Expected SKU</label>
+        <input name="sku" id="demo-sku" maxlength="80" required>
+        <label for="demo-catalog">Catalog photo</label>
+        <input name="catalog" id="demo-catalog" type="file" accept="image/jpeg,image/png,image/webp" required>
+        <button class="button" type="submit">Create buyer link</button>
+      </form>
+      <p id="buyer-link-status" role="status" aria-live="polite"></p>
+      <div id="buyer-link-result" hidden>
+        <label for="buyer-link-value">Private buyer link</label>
+        <input id="buyer-link-value" type="url" readonly>
+        <div class="review-actions">
+          <button class="secondary" id="copy-buyer-link" type="button">Copy link</button>
+          <a id="open-buyer-link" target="_blank" rel="noopener noreferrer">Open buyer page</a>
+        </div>
+      </div>
+    </details>
+    <h2>Saved inspections</h2>
     <div class="review-actions">
       <button type="button" class="secondary" id="refresh">Refresh inspections</button>
     </div>

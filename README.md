@@ -72,7 +72,11 @@ The portal is in [demo/](demo/). It is separate from the marketing site and pilo
 
 4. In the Worker's **Settings → Domains & Routes**, assign the hostname used for Cloudflare Access. Open that hostname as a merchant. The root redirects to the protected review queue.
 
-### Try the included buyer page
+### Try the live demo from the marketing site
+
+Click **Try the live demo** on the marketing site and open the merchant portal. Sign in, enter a return reference and SKU, and upload a catalog photo. **Create buyer link** gives you a private 30-minute link to open on a phone. After the buyer submits, refresh the merchant queue and review the findings.
+
+### Create a buyer link from the terminal
 
 With the Worker deployed and migrations applied, create a link from `demo/` using a JPEG catalog photo and the expected SKU. In the same PowerShell window where you generated `$buyerToken`, run:
 

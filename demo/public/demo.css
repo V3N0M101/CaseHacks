@@ -6,3 +6,7 @@ h2 { font-size: clamp(1.55rem, 3vw, 2.2rem); }
 .review-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
 .review-card { margin-block: 1rem; }
 .review-card p, .review-card h2 { overflow-wrap: anywhere; }
+.buyer-link { margin-bottom: 1.75rem; }
+.buyer-link summary { cursor: pointer; font-weight: 750; margin-bottom: .75rem; }
+.buyer-link form, #buyer-link-result { max-width: 37rem; }
+#buyer-link-status { margin: .65rem 0; }
