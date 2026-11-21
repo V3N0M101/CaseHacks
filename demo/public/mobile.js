@@ -2,6 +2,7 @@ const get = (id) => document.getElementById(id);
 const start = get('start');
 const status = get('status');
 const camera = get('camera');
+const preview = get('live-preview');
 const capture = get('capture');
 const take = get('take');
 const confirm = get('confirm');
@@ -10,34 +11,48 @@ const retake = get('retake');
 const token = location.hash.slice(1);
 const prompts = ['Show the full front of the item', 'Show the full back of the item', 'Hold the SKU or care label close to the camera'];
 let stream;
+let cameraRevision = 0;
 let item = [];
 let label = [];
 
 function stopCamera() {
+  cameraRevision += 1;
   stream?.getTracks().forEach(track => track.stop());
   stream = undefined;
   camera.srcObject = null;
+  preview.hidden = true;
   take.disabled = true;
 }
 
 async function startCamera() {
+  const revision = ++cameraRevision;
   start.disabled = true;
   retake.disabled = true;
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera access needs HTTPS and a compatible browser.');
-    const current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-    stream = current;
+    if (!stream?.active) {
+      const current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      if (revision !== cameraRevision) {
+        current.getTracks().forEach(track => track.stop());
+        return;
+      }
+      stream = current;
+      camera.srcObject = current;
+    }
+    preview.hidden = false;
+    await camera.play();
+    if (revision !== cameraRevision) return;
     item = [];
     label = [];
-    camera.srcObject = current;
+    get('previews').replaceChildren();
     get('prompt').textContent = prompts[0];
     confirm.hidden = true;
     capture.hidden = false;
     start.hidden = true;
     status.textContent = '';
-    await camera.play();
     take.disabled = false;
   } catch (error) {
+    if (revision !== cameraRevision) return;
     stopCamera();
     capture.hidden = true;
     start.hidden = !confirm.hidden;
@@ -72,7 +87,6 @@ take.addEventListener('click', async () => {
     await new Promise(resolve => setTimeout(resolve, 450));
     if (current !== stream) return;
     label = [first, snapshot()];
-    stopCamera();
     capture.hidden = true;
     const images = [...item, label[0]].map((frame, index) => {
       const image = new Image();
@@ -86,7 +100,7 @@ take.addEventListener('click', async () => {
   } catch (error) {
     status.textContent = error.message;
   } finally {
-    take.disabled = !stream;
+    take.disabled = !stream || capture.hidden;
   }
 });
 
@@ -103,6 +117,7 @@ submit.addEventListener('click', async () => {
     });
     const result = await response.json();
     if (!response.ok || !result.reference) throw new Error(result.error || 'The return could not be submitted.');
+    stopCamera();
     item = [];
     label = [];
     get('previews').replaceChildren();
@@ -124,10 +139,14 @@ retake.addEventListener('click', startCamera);
 get('stop').addEventListener('click', () => {
   stopCamera();
   capture.hidden = true;
-  start.hidden = false;
+  start.hidden = !confirm.hidden;
   status.textContent = 'Camera stopped.';
 });
-window.addEventListener('pagehide', stopCamera);
+window.addEventListener('pagehide', () => {
+  stopCamera();
+  capture.hidden = true;
+  start.hidden = !confirm.hidden || !get('done').hidden;
+});
 
 if (/^[a-f0-9]{64}$/.test(token)) start.disabled = false;
 else status.textContent = 'Open the full return link from your merchant to begin.';

@@ -13,15 +13,18 @@
   <header class="site-header"><div class="wrap header-row"><span class="wordmark"><span class="brand-mark" aria-hidden="true"></span>ReturnProof</span></div></header>
   <main class="wrap section buyer">
     <h1>Show us your return</h1>
-    <p>Use your phone camera to show the front, back and label. Keep faces and personal details out of view. We send only the captured images for inspection and the merchant makes the refund decision.</p>
+    <p>Use your live phone camera to show the front, back and label. Keep faces and personal details out of view. We send only the captured images for inspection and the merchant makes the refund decision.</p>
     <p id="status" role="status" aria-live="polite"></p>
     <button class="button" id="start" type="button" disabled>Start camera</button>
-    <section id="capture" hidden aria-labelledby="prompt">
-      <h2 id="prompt"></h2>
-      <video id="camera" autoplay muted playsinline aria-label="Camera preview"></video>
-      <button class="button" id="take" type="button" disabled>Capture and continue</button>
+    <div id="live-preview" hidden>
+      <p class="live-indicator"><span aria-hidden="true"></span>Live camera</p>
+      <video id="camera" autoplay muted playsinline aria-label="Live camera preview"></video>
+      <section id="capture" hidden aria-labelledby="prompt">
+        <h2 id="prompt"></h2>
+        <button class="button" id="take" type="button" disabled>Capture and continue</button>
+      </section>
       <button id="stop" type="button">Stop camera</button>
-    </section>
+    </div>
     <section id="confirm" hidden>
       <h2>Review your images</h2>
       <div id="previews"></div>
