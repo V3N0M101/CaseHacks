@@ -8,12 +8,62 @@ const take = get('take');
 const confirm = get('confirm');
 const submit = get('submit');
 const retake = get('retake');
+const retryAnalysis = get('retry-analysis');
+const analysisStatus = get('analysis-status');
 const token = location.hash.slice(1);
 const prompts = ['Show the full item', 'Hold the SKU or care label close to the camera'];
 let stream;
 let cameraRevision = 0;
-let item = [];
-let label = [];
+let stages = {};
+let submitting = false;
+
+function renderAnalysis() {
+  const views = Object.entries(stages);
+  analysisStatus.hidden = !views.length;
+  analysisStatus.textContent = views.map(([stage, result]) => {
+    const name = stage === 'item' ? 'Item' : 'Label';
+    if (result.error) return `${name}: ${result.error}`;
+    return result.id ? `${name} analyzed.` : `Analyzing ${stage}…`;
+  }).join(' ');
+  retryAnalysis.hidden = !views.some(([, result]) => result.error);
+  submit.disabled = submitting || !stages.item?.id || !stages.label?.id;
+}
+
+function clearAnalysis() {
+  for (const result of Object.values(stages)) result.controller.abort();
+  stages = {};
+  renderAnalysis();
+}
+
+async function buyerRequest(operation, data, signal) {
+  const response = await fetch(`/api/buyer/${operation}`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+    signal,
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'The request could not be completed.');
+  return result;
+}
+
+async function analyze(stage, frames) {
+  const controller = new AbortController();
+  const view = { controller, frames };
+  stages[stage] = view;
+  renderAnalysis();
+  try {
+    const result = await buyerRequest('analyze', { stage, frames },
+      AbortSignal.any([controller.signal, AbortSignal.timeout(32000)]));
+    if (!result.analysisId) throw new Error('Analysis did not return a result.');
+    view.id = result.analysisId;
+  } catch (error) {
+    if (controller.signal.aborted) return;
+    view.error = error.name === 'TimeoutError' ? 'Analysis timed out. Try again.' : error.message;
+  } finally {
+    if (stages[stage] === view) renderAnalysis();
+  }
+}
 
 function stopCamera() {
   cameraRevision += 1;
@@ -42,8 +92,7 @@ async function startCamera() {
     preview.hidden = false;
     await camera.play();
     if (revision !== cameraRevision) return;
-    item = [];
-    label = [];
+    clearAnalysis();
     get('previews').replaceChildren();
     get('prompt').textContent = prompts[0];
     confirm.hidden = true;
@@ -82,14 +131,14 @@ take.addEventListener('click', async () => {
     await new Promise(resolve => setTimeout(resolve, 450));
     if (current !== stream) return;
     const second = snapshot();
-    if (!item.length) {
-      item = [first, second];
+    if (!stages.item) {
+      void analyze('item', [first, second]);
       get('prompt').textContent = prompts[1];
       return;
     }
-    label = [first, second];
+    void analyze('label', [first, second]);
     capture.hidden = true;
-    const images = [item[0], label[0]].map((frame, index) => {
+    const images = [stages.item.frames[0], first].map((frame, index) => {
       const image = new Image();
       image.alt = ['Item', 'Return label'][index];
       image.src = 'data:image/jpeg;base64,' + frame;
@@ -97,7 +146,7 @@ take.addEventListener('click', async () => {
     });
     get('previews').replaceChildren(...images);
     confirm.hidden = false;
-    submit.focus();
+    get('confirm-heading').focus();
   } catch (error) {
     status.textContent = error.message;
   } finally {
@@ -105,22 +154,26 @@ take.addEventListener('click', async () => {
   }
 });
 
+retryAnalysis.addEventListener('click', () => {
+  for (const [stage, result] of Object.entries(stages)) {
+    if (result.error) void analyze(stage, result.frames);
+  }
+});
+
 submit.addEventListener('click', async () => {
-  submit.disabled = true;
+  if (submit.disabled) return;
+  submitting = true;
+  renderAnalysis();
   retake.disabled = true;
-  status.textContent = 'Submitting your return…';
+  status.textContent = 'Sending findings to the merchant…';
   try {
-    const response = await fetch('/api/buyer/submit', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ item, label }),
-      signal: AbortSignal.timeout(35000),
-    });
-    const result = await response.json();
-    if (!response.ok || !result.reference) throw new Error(result.error || 'The return could not be submitted.');
+    const result = await buyerRequest('complete', {
+      itemAnalysisId: stages.item.id,
+      labelAnalysisId: stages.label.id,
+    }, AbortSignal.timeout(15000));
+    if (!result.reference) throw new Error('The return could not be submitted.');
     stopCamera();
-    item = [];
-    label = [];
+    clearAnalysis();
     get('previews').replaceChildren();
     confirm.hidden = true;
     get('receipt').textContent = 'Reference ' + result.reference;
@@ -130,7 +183,8 @@ submit.addEventListener('click', async () => {
   } catch (error) {
     status.textContent = error.name === 'TimeoutError' ? 'Submission timed out. Try Submit again.' : error.message;
   } finally {
-    submit.disabled = false;
+    submitting = false;
+    renderAnalysis();
     retake.disabled = false;
   }
 });
