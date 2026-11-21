@@ -98,6 +98,8 @@ const imageErrorCodes = new Set([
   'image_parse_error', 'image_too_large', 'unsupported_image_media_type',
 ]);
 
+const quotaErrorCodes = new Set(['insufficient_quota', 'billing_hard_limit_reached', 'billing_not_active']);
+
 class InspectionError extends Error {
   constructor(code, detail) {
     super(code);
@@ -113,16 +115,16 @@ async function checkVisionResponse(response) {
     (await response.json().catch(() => null))?.error?.code : undefined;
   const code = status === 401 || status === 403 ? 'provider_auth' :
     status === 404 ? 'provider_model' :
-    status === 429 ? (providerCode === 'insufficient_quota' ? 'provider_quota' : 'provider_rate_limit') :
+    status === 429 ? (quotaErrorCodes.has(providerCode) ? 'provider_quota' : 'provider_rate_limit') :
     imageErrorCodes.has(providerCode) ? 'provider_image' : 'provider_http';
   throw new InspectionError(code, status);
 }
 
-function inspectionFailure(error) {
+function inspectionFailure(error, model) {
   const code = error instanceof InspectionError ? error.code :
     error?.name === 'TimeoutError' ? 'provider_timeout' :
     error?.name === 'AbortError' ? 'request_cancelled' : 'provider_transport';
-  console.error('Inspection failed', { code, ...(error instanceof InspectionError && { detail: error.detail }) });
+  console.error('Inspection failed', { code, model, ...(error instanceof InspectionError && { detail: error.detail }) });
   const messages = {
     provider_auth: 'The inspection service could not sign in to its vision provider. Ask the merchant to check the API key.',
     provider_model: 'The configured inspection model is unavailable. Ask the merchant to check model access.',
@@ -267,7 +269,7 @@ async function submitInspection(input, request, env) {
   try {
     result = await inspectImages(input, env, request.signal);
   } catch (error) {
-    return inspectionFailure(error);
+    return inspectionFailure(error, env.OPENAI_MODEL);
   }
 
   return saveInspection(input, result, db);
@@ -300,7 +302,7 @@ async function analyzeBuyerView(link, input, request, env) {
   try {
     result = await inspectImages({ ...link, [stage]: input.frames }, env, request.signal, stage);
   } catch (error) {
-    return inspectionFailure(error);
+    return inspectionFailure(error, env.OPENAI_MODEL);
   }
 
   const id = crypto.randomUUID();
