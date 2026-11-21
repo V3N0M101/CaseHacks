@@ -9,7 +9,7 @@
   },
   "vars": {
     "OPENAI_MODEL": "gpt-4.1-mini",
-    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_TEAM_DOMAIN": "old-hill-c1f9.cloudflareaccess.com",
     "ACCESS_AUDIENCE": "eaf7b216ef8e2ead67814d0e3f8b434ed8c7223d3f493ad7cc577ab7f349b54f"
   },
   "triggers": { "crons": ["23 3 * * *"] },
