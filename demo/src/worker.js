@@ -145,9 +145,137 @@ async function inspectImages(input, env, signal) {
   };
 }
 
+function validReference(input) {
+  return input && typeof input.buyerReference === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(input.buyerReference) &&
+    typeof input.sku === 'string' && /^[A-Za-z0-9][A-Za-z0-9 ./_-]{0,79}$/.test(input.sku);
+}
+
+async function hashToken(token) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function issueBuyerLink(input, env, url) {
+  const expiresAt = Date.now() + 30 * 60 * 1000;
+  const token = crypto.randomUUID().replaceAll('-', '') + crypto.randomUUID().replaceAll('-', '');
+  const result = await env.INSPECTIONS_DB.prepare(
+    'INSERT INTO buyer_links (token_hash, buyer_reference, sku, catalog, expires_at) VALUES (?, ?, ?, ?, ?)',
+  ).bind(await hashToken(token), input.buyerReference, input.sku, input.catalog, expiresAt).run();
+  if (!result.success) throw new Error('Buyer link insert failed');
+  const link = new URL('/mobile', url);
+  link.hash = token;
+  return json({ url: link.href, expiresAt: new Date(expiresAt).toISOString() }, 201);
+}
+
+async function loadBuyerLink(request, env) {
+  const match = /^Bearer ([a-f0-9]{64})$/.exec(request.headers.get('Authorization') || '');
+  if (!match) return null;
+  return env.INSPECTIONS_DB.prepare(
+    'SELECT buyer_reference AS buyerReference, sku, catalog FROM buyer_links WHERE token_hash = ? AND expires_at > ?',
+  ).bind(await hashToken(match[1]), Date.now()).first();
+}
+
+async function submitInspection(input, request, env) {
+  const db = env.INSPECTIONS_DB;
+  try {
+    const existing = await findSubmission(db, input.buyerReference);
+    if (existing) return receipt(existing, input.sku, 200);
+  } catch {
+    return json({ error: 'Inspection storage is unavailable.' }, 503);
+  }
+
+  if (!env.OPENAI_API_KEY || !env.INSPECTION_LIMIT) {
+    return json({ error: 'Inspection processing is awaiting configuration.' }, 503);
+  }
+  try {
+    const { success } = await env.INSPECTION_LIMIT.limit({
+      key: request.headers.get('CF-Connecting-IP') || 'buyer-intake',
+    });
+    if (!success) return json({ error: 'Too many attempts. Try again in a minute.' }, 429);
+  } catch {
+    return json({ error: 'The inspection service is temporarily unavailable.' }, 503);
+  }
+
+  let result;
+  try {
+    result = await inspectImages(input, env, request.signal);
+  } catch {
+    return json({ error: 'Inspection could not be completed. Please try again.' }, 502);
+  }
+
+  const reference = crypto.randomUUID();
+  try {
+    const saved = await db.prepare(
+      'INSERT INTO inspections (reference, buyer_reference, sku, findings, elapsed_ms, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(buyer_reference) DO NOTHING',
+    ).bind(reference, input.buyerReference, input.sku, JSON.stringify(result.findings), result.elapsedMs, new Date().toISOString()).run();
+    if (!saved.success) throw new Error('Insert failed');
+    if (saved.meta.changes === 1) return json({ reference, buyerReference: input.buyerReference }, 201);
+    const existing = await findSubmission(db, input.buyerReference);
+    if (existing) return receipt(existing, input.sku, 200);
+  } catch {
+    return json({ error: 'Could not save the inspection for merchant review. Please try again.' }, 503);
+  }
+  return json({ error: 'Inspection storage changed during submission. Please try again.' }, 503);
+}
+
+async function buyerApi(request, url, env) {
+  const path = url.pathname;
+  const buyer = path === '/api/buyer/submit';
+  if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405);
+  if (buyer ? request.headers.get('Origin') !== url.origin : request.headers.has('Origin')) {
+    return json({ error: buyer ? 'Open the buyer link in your browser.' : 'Use the buyer capture backend.' }, 403);
+  }
+  if (!env.INSPECTIONS_DB) return json({ error: 'Inspection storage is unavailable.' }, 503);
+  let link;
+  if (buyer) {
+    try {
+      link = await loadBuyerLink(request, env);
+    } catch {
+      return json({ error: 'Could not load the buyer link. Try again.' }, 503);
+    }
+    if (!link) return json({ error: 'This buyer link is invalid or has expired.' }, 401);
+  } else {
+    if (!/^[A-Za-z0-9_-]{32,128}$/.test(env.BUYER_INTAKE_TOKEN || '')) {
+      return json({ error: 'Buyer intake is awaiting configuration.' }, 503);
+    }
+    if (!(await authorized(request, env.BUYER_INTAKE_TOKEN))) {
+      return json({ error: 'Buyer intake credentials are required.' }, 401);
+    }
+  }
+  if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') {
+    return json({ error: 'Send JSON.' }, 415);
+  }
+  let input;
+  try {
+    input = await readInput(request);
+  } catch {
+    return json({ error: 'Could not read the submission.' }, 400);
+  }
+  if (input === null) return json({ error: 'The images are too large.' }, 413);
+  if (buyer && input) input = { ...link, item: input.item, label: input.label };
+  if (!validReference(input) || !isJpeg(input.catalog)) {
+    return json({ error: 'Provide a valid buyer reference, SKU, and catalog image.' }, 400);
+  }
+  if (path === '/api/buyer-links') {
+    try {
+      return await issueBuyerLink(input, env, url);
+    } catch {
+      return json({ error: 'Could not create the buyer link.' }, 503);
+    }
+  }
+  if (!isBurst(input.item) || !isBurst(input.label)) {
+    return json({ error: 'Provide two JPEG frames for the item and two for the label.' }, 400);
+  }
+  return submitInspection(input, request, env);
+}
+
 export default {
   async scheduled(_event, env) {
-    await env.INSPECTIONS_DB.prepare('DELETE FROM inspections WHERE created_at < ?').bind(retentionCutoff()).run();
+    await env.INSPECTIONS_DB.batch([
+      env.INSPECTIONS_DB.prepare('DELETE FROM inspections WHERE created_at < ?').bind(retentionCutoff()),
+      env.INSPECTIONS_DB.prepare('DELETE FROM buyer_links WHERE expires_at <= ?').bind(Date.now()),
+    ]);
   },
 
   async fetch(request, env) {
@@ -155,79 +283,19 @@ export default {
     if (url.pathname === '/') {
       return new Response(null, { status: 302, headers: { Location: '/review', 'Cache-Control': 'no-store' } });
     }
+    if (url.pathname === '/mobile' && request.method === 'GET') {
+      const asset = await env.ASSETS.fetch(request);
+      const headers = new Headers(asset.headers);
+      headers.set('Permissions-Policy', 'camera=(self), microphone=()');
+      headers.set('Content-Security-Policy', "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self'; img-src data:; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'");
+      headers.set('Referrer-Policy', 'no-referrer');
+      return new Response(asset.body, { status: asset.status, headers });
+    }
     if (['/merchant', '/merchant.html'].includes(url.pathname)) return json({ error: 'Open /review instead.' }, 404);
     if (url.pathname === '/review' || url.pathname.startsWith('/review/')) {
       return handleReview(request, url, env, json);
     }
-    if (url.pathname !== '/api/inspect') {
-      return url.pathname.startsWith('/api/') ? json({ error: 'Unknown endpoint.' }, 404) : env.ASSETS.fetch(request);
-    }
-    if (request.method !== 'POST') return json({ error: 'Use POST to submit an inspection.' }, 405);
-    if (request.headers.has('Origin')) return json({ error: 'Submit through the buyer capture backend.' }, 403);
-    if (!/^[A-Za-z0-9_-]{32,128}$/.test(env.BUYER_INTAKE_TOKEN || '')) {
-      return json({ error: 'Buyer intake is awaiting configuration.' }, 503);
-    }
-    if (!(await authorized(request, env.BUYER_INTAKE_TOKEN))) {
-      return json({ error: 'Buyer intake credentials are required.' }, 401);
-    }
-    if (request.headers.get('Content-Type')?.split(';')[0] !== 'application/json') {
-      return json({ error: 'Send JSON frames.' }, 415);
-    }
-    if (!env.INSPECTIONS_DB) return json({ error: 'Inspection storage is unavailable.' }, 503);
-
-    let input;
-    try {
-      input = await readInput(request);
-    } catch {
-      return json({ error: 'Could not read the inspection data.' }, 400);
-    }
-    if (input === null) return json({ error: 'The frames are too large.' }, 413);
-    if (!input || typeof input.buyerReference !== 'string' ||
-        !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$/.test(input.buyerReference) ||
-        typeof input.sku !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9 ./_-]{0,79}$/.test(input.sku) ||
-        !isJpeg(input.catalog) || !isBurst(input.item) || !isBurst(input.label)) {
-      return json({ error: 'Provide a buyer reference, SKU, catalog image, and two frames for each return view.' }, 400);
-    }
-
-    const db = env.INSPECTIONS_DB;
-    try {
-      const existing = await findSubmission(db, input.buyerReference);
-      if (existing) return receipt(existing, input.sku, 200);
-    } catch {
-      return json({ error: 'Inspection storage is unavailable.' }, 503);
-    }
-
-    if (!env.OPENAI_API_KEY || !env.INSPECTION_LIMIT) {
-      return json({ error: 'Inspection processing is awaiting configuration.' }, 503);
-    }
-    try {
-      const { success } = await env.INSPECTION_LIMIT.limit({
-        key: request.headers.get('CF-Connecting-IP') || 'buyer-intake',
-      });
-      if (!success) return json({ error: 'Too many attempts. Try again in a minute.' }, 429);
-    } catch {
-      return json({ error: 'The inspection service is temporarily unavailable.' }, 503);
-    }
-
-    let result;
-    try {
-      result = await inspectImages(input, env, request.signal);
-    } catch {
-      return json({ error: 'Inspection could not be completed. Please try again.' }, 502);
-    }
-
-    const reference = crypto.randomUUID();
-    try {
-      const saved = await db.prepare(
-        'INSERT INTO inspections (reference, buyer_reference, sku, findings, elapsed_ms, created_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(buyer_reference) DO NOTHING',
-      ).bind(reference, input.buyerReference, input.sku, JSON.stringify(result.findings), result.elapsedMs, new Date().toISOString()).run();
-      if (!saved.success) throw new Error('Insert failed');
-      if (saved.meta.changes === 1) return json({ reference, buyerReference: input.buyerReference }, 201);
-      const existing = await findSubmission(db, input.buyerReference);
-      if (existing) return receipt(existing, input.sku, 200);
-    } catch {
-      return json({ error: 'Could not save the inspection for merchant review. Please try again.' }, 503);
-    }
-    return json({ error: 'Inspection storage changed during submission. Please try again.' }, 503);
+    if (['/api/inspect', '/api/buyer-links', '/api/buyer/submit'].includes(url.pathname)) return buyerApi(request, url, env);
+    return url.pathname.startsWith('/api/') ? json({ error: 'Unknown endpoint.' }, 404) : env.ASSETS.fetch(request);
   },
 };

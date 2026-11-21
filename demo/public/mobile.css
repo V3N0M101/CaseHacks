@@ -1,0 +1,7 @@
+.buyer { max-width: 31rem; }
+.buyer h1 { font-size: clamp(2rem, 8vw, 3.8rem); }
+.buyer video { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--ink); border-radius: .45rem; margin-bottom: .7rem; }
+.buyer button { margin: .25rem .35rem .25rem 0; }
+#previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; margin-bottom: .75rem; }
+#previews img { width: 100%; border-radius: .35rem; }
+#receipt { overflow-wrap: anywhere; }

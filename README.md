@@ -53,7 +53,7 @@ LIMIT 50;
 
 ## Deploy the merchant inspection portal to Cloudflare Workers
 
-The portal is in [demo/](demo/). It is separate from the marketing site and pilot form. Buyers capture the item and label in your phone app or mobile return flow. That flow's backend submits the images. Merchants sign in to review the resulting findings and accept or reject the return. The portal does not trigger a Shopify refund.
+The portal is in [demo/](demo/). It is separate from the marketing site and pilot form. Buyers capture the item and label on their phone using an expiring buyer link or your existing mobile return flow. Merchants sign in to review the resulting findings and accept or reject the return. The portal does not trigger a Shopify refund.
 
 1. Run `npx wrangler login`. If needed, create the database with `npx wrangler d1 create returnproof-inspections` and copy its ID into [demo/wrangler.jsonc](demo/wrangler.jsonc) under `INSPECTIONS_DB`.
 2. In Cloudflare Zero Trust → **Access → Applications**, add a self-hosted application for the merchant portal hostname at `/review` and `/review/*`. Allow only merchant reviewers. Set `ACCESS_TEAM_DOMAIN` to your team's `<team>.cloudflareaccess.com` hostname without a scheme, and set `ACCESS_AUDIENCE` to the Access application AUD tag. The Worker also verifies the Access token.
@@ -72,7 +72,20 @@ The portal is in [demo/](demo/). It is separate from the marketing site and pilo
 
 4. In the Worker's **Settings → Domains & Routes**, assign the hostname used for Cloudflare Access. Open that hostname as a merchant. The root redirects to the protected review queue.
 
-### Connect the buyer's capture backend
+### Try the included buyer page
+
+With the Worker deployed and migrations applied, create a link from `demo/` using a JPEG catalog photo and the expected SKU. In the same PowerShell window where you generated `$buyerToken`, run:
+
+```powershell
+$env:BUYER_INTAKE_TOKEN = $buyerToken
+node scripts/create-buyer-link.mjs https://returnproof-demo.mxtong28.workers.dev return-demo-001 SKU-123 C:\path\to\catalog.jpg
+```
+
+If you closed that terminal, load the intake token from your secret store into `BUYER_INTAKE_TOKEN` locally. Use the actual expected SKU and a different reference for each new inspection. The script prints a link valid for 30 minutes. Send it privately to the buyer. On their phone, they capture the front, back and label, then tap **Submit return**. A receipt appears once the result has been saved. The merchant can then refresh `/review` and accept or reject it. The merchant page does not use the camera.
+
+For automated link creation, your trusted backend can send `POST /api/buyer-links` with the intake bearer token and JSON containing `buyerReference`, `sku`, and `catalog` as base64 JPEG. Keep `/mobile`, `/api/buyer-links`, and `/api/buyer/submit` outside the merchant Access policy. The buyer link is scoped to the reference and SKU, and its token is sent in the authorization header when submitting. D1 holds the catalog reference for that link and removes it after expiration via the daily cleanup. Buyer images are processed without storage by the Worker.
+
+### Connect an existing buyer capture backend
 
 Authenticate the buyer and verify their return in your existing flow. Resolve the expected SKU and catalog photo on the backend. Extract two usable JPEG frames of the whole item and two of the label from the phone capture. Send a server-to-server request:
 
@@ -92,7 +105,7 @@ Content-Type: application/json
 }
 ```
 
-Use base64 without a data URL prefix. Each encoded image can be up to 500,000 characters. A new submission returns HTTP 201 with `reference` and `buyerReference`; a successful retry with the same buyer reference and SKU returns the original receipt with HTTP 200. Use a new buyer reference for a new capture. Never include buyer personal details in the reference. The buyer capture app and its backend are separate from this repo.
+Use base64 without a data URL prefix. Each encoded image can be up to 500,000 characters. A new submission returns HTTP 201 with `reference` and `buyerReference`; a successful retry with the same buyer reference and SKU returns the original receipt with HTTP 200. Use a new buyer reference for a new capture. Never include buyer personal details in the reference. Use this endpoint when your existing backend already captures and validates the return.
 
 For a smoke test, send one authorized test submission, confirm its reference appears in `/review`, record a decision, and refresh to verify it persists. Confirm a signed-out request cannot read the queue. The Worker keeps findings and decisions for 30 days in D1. The Worker does not retain source images or video. The vision provider processes the submitted images under your account data controls.
 
